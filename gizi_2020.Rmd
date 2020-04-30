@@ -1,0 +1,239 @@
+---
+title: "Pengenalan R, RStudio, ggplot, PCA, Git, sogosurvey.com"
+author: "Fitriyono Ayustaningwarno"
+date: "4/12/2020"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+#package
+```{r package}
+knitr::opts_chunk$set(echo = TRUE)
+library(knitr) # untuk R markdown
+library(Rmisc) # untuk fungsi summarySE
+library(agricolae)# untuk fungsi HSD.test
+library(ggplot2) #untuk fungsi grafik dengna ggplot
+library(cowplot) #untuk membuat grafik grid
+library(rstatix ) #untuk fungsi uji normalitas shapiro wilk
+library(ggpubr) #untuk membuat density plot uji normalitas
+library(dplyr) #fungsi kalkulasi untuk membuat boxplot
+library(tidyr) #fungsi kalkulasi untuk membuat boxplot
+library(ggfortify) #untuk membuat pca dengan ggplot
+
+```
+
+#data
+```{r}
+data(ToothGrowth)
+ToothGrowth
+```
+
+# summarySE
+
+```{r summarySE}
+ToothGrowth_sum<-summarySE(data = ToothGrowth, "len", groupvars = c("supp", "dose"), na.rm = FALSE, 
+          conf.interval = 0.95, .drop = TRUE)
+ToothGrowth_sum
+str(ToothGrowth)
+
+```
+# statistik
+##linier model
+
+```{r}
+tx_supp_dose <- with(ToothGrowth, interaction(supp, dose))
+lm_supp_dose <- lm(len~tx_supp_dose, data = ToothGrowth)
+summary(lm_supp_dose)
+```
+
+##anova test
+```{r}
+anova(lm_supp_dose)
+
+```
+
+##HSD test group
+```{r}
+HSD_supp_dose<-HSD.test(lm_supp_dose, trt = "tx_supp_dose", group = TRUE, console=TRUE)
+
+```
+
+## HSD test group p value
+```{r}
+HSD_supp_doseP<-HSD.test(lm_supp_dose, trt = "tx_supp_dose", group = FALSE, console=TRUE)
+
+```
+
+# grafik
+## base
+```{r}
+plot(ToothGrowth_sum$dose,ToothGrowth_sum$len)
+#fungsi plot dasar pada R tidak dapat melakukan gruping, sehingga jenis suplemen tidak dapat diamati
+
+```
+##grafik ggplot
+###grafik ggplot dalam 1 plot
+```{r}
+g.ToothGrowth<- 
+  ggplot(data = ToothGrowth_sum,aes(x = dose,y=len), na.rm = FALSE) +
+    geom_point(data = ToothGrowth_sum, aes(color=supp), size=4)+
+  theme_classic(base_size = 14)+
+  xlab("Dose (mg)") +
+  ylab("Length (mm)")
+ g.ToothGrowth
+```
+
+###grafik ggplot dalam 2 plot bersusun
+```{r}
+g.ToothGrowth_grid<- 
+  ggplot(data = ToothGrowth_sum,aes(x = dose,y=len), na.rm = FALSE) +
+    geom_point()+
+  theme_classic(base_size = 14)+
+  xlab("Dose (mg)") +
+  ylab("Length (mm)")+
+  facet_grid(cols = vars(supp))
+ g.ToothGrowth_grid
+```
+
+###grafik ggplot dalam 2 plot manual
+```{r}
+g.ToothGrowth_OJ<- 
+  ggplot(data = ToothGrowth_sum[ToothGrowth_sum$supp=="OJ",],aes(x = dose,y=len), na.rm = FALSE) +
+    geom_point()+
+  theme_classic(base_size = 14)+
+  xlab("Dose (mg)") +
+  ylab("Length (mm)")
+g.ToothGrowth_OJ
+
+g.ToothGrowth_VC<- 
+  ggplot(data = ToothGrowth_sum[ToothGrowth_sum$supp=="VC",],aes(x = dose,y=len), na.rm = FALSE) +
+    geom_line()+
+  geom_point()+
+  theme_classic(base_size = 14)+
+  xlab("Dose (mg)") +
+  ylab("Length (mm)")
+g.ToothGrowth_VC
+
+
+g.ToothGrowth_grid<-plot_grid(g.ToothGrowth_OJ, g.ToothGrowth_VC,                       ncol=2,  align = 'v', rel_heights = c(1/5, 1/5),
+                           labels = c('A', 'B'))
+g.ToothGrowth_grid
+
+ggsave("g.ToothGrowth_grid.pdf", plot= g.ToothGrowth_grid,  width = 200, height = 130, units = "mm")
+#untuk menyimpan dalam bentuk pdf
+ggsave("g.ToothGrowth_grid.png", plot= g.ToothGrowth_grid,  width = 200, height = 130, units = "mm")
+#untuk menyimpan dalam bentuk png
+rm(g.ToothGrowth_OV)
+```
+
+#PCA
+##data
+```{r}
+#data
+data("iris")
+iris
+```
+
+## data profile
+```{r}
+iris %>% shapiro_test(Sepal.Length, Sepal.Width, Petal.Length, Petal.Width)
+#  p-value > 0.05 implying that the distribution of the data are not significantly different from normal distribution. In other words, we can assume the normality.
+
+
+g.density_Sepal.Length<-ggdensity(iris$Sepal.Length, 
+          main = "Density plot of Sepal Length",
+          xlab = "Sepal Length")
+
+g.density_Sepal.Width<-ggdensity(iris$Sepal.Width, 
+          main = "Density plot of Sepal Width",
+          xlab = "Sepal Width")
+
+g.density_Petal.Length<-ggdensity(iris$Petal.Length, 
+          main = "Density plot of Petal Length",
+          xlab = "Petal Length")
+
+g.density_Petal.Width<-ggdensity(iris$Petal.Width, 
+          main = "Density plot of Petal Width",
+          xlab = "Petal Width")
+
+
+g.density_iris_grid<-plot_grid(g.density_Petal.Length, g.density_Petal.Width, g.density_Sepal.Length, g.density_Sepal.Width,                       ncol=2,  align = 'v', rel_heights = c(1/5, 1/5, 1/5, 1/5),
+                           labels = c('A', 'B', 'C', 'D'))
+g.density_iris_grid
+```
+
+##data transformation
+###log transformation
+```{r}
+#https://www.r-bloggers.com/computing-and-visualizing-pca-in-r/
+#menggunakan log transformation, scaling and mean centering transformation
+log.ir <- log(iris[, 1:4])
+ir.species <- iris[, 5]
+log.ir
+iris_log<-cbind(log.ir,ir.species)
+
+log.ir %>% shapiro_test(Sepal.Length, Sepal.Width, Petal.Length, Petal.Width)
+```
+
+### scaling and mean centering
+```{r}
+iris_data<-iris[,1:4]
+iris_center_scale_data<-as.data.frame(scale(iris_data, center = TRUE, scale = TRUE))
+iris_center_scale<-cbind(iris_center_scale_data, ir.species)
+iris_log_center_scale_data<-as.data.frame(scale(log.ir, center = TRUE, scale = TRUE))
+iris_log_center_scale<-cbind(iris_log_center_scale_data, ir.species)
+
+
+```
+
+##boxspot comparison with ggplot
+```{r}
+g.boxplot_iris<-iris %>% dplyr::select(Species, everything()) %>% tidyr::gather("id", "value",2:5) %>% 
+  ggplot(., aes(x = id, y = value))+geom_boxplot()
+
+g.boxplot_iris_log<-iris_log %>% dplyr::select(ir.species, everything()) %>% tidyr::gather("id", "value",2:5) %>% 
+  ggplot(., aes(x = id, y = value))+geom_boxplot()
+
+g.boxplot_iris_center_scale<-iris_center_scale %>% dplyr::select(ir.species, everything()) %>% tidyr::gather("id", "value",2:5) %>% 
+  ggplot(., aes(x = id, y = value))+geom_boxplot()
+
+g.boxplot_iris_log_center_scale<-iris_log_center_scale %>% dplyr::select(ir.species, everything()) %>% tidyr::gather("id", "value",2:5) %>% 
+  ggplot(., aes(x = id, y = value))+geom_boxplot()
+
+g.boxplot_iris_comparison<-plot_grid(g.boxplot_iris, g.boxplot_iris_log, g.boxplot_iris_center_scale, g.boxplot_iris_log_center_scale, ncol=2,  align = 'v', rel_heights = c(1/5, 1/5, 1/5, 1/5),
+                           labels = c('A', 'B', 'C', 'D'))
+g.boxplot_iris_comparison
+# A. g.boxplot_iris, 
+# B. g.boxplot_iris_log,
+# C. g.boxplot_iris_center_scale,
+# D. g.boxplot_iris_log_center_scale
+```
+
+
+##PCA dengan ggplot profil lengkap
+
+```{r}
+g.pca_iris_compl<-autoplot(prcomp(iris_data), data = iris, colour = 'Species', frame = T, loadings = TRUE, loadings.label = TRUE)
+g.pca_iris_compl
+g.scree_iris<-plot(prcomp(iris_data))
+g.scree_iris
+```
+
+##PCA dengan ggplot perbandingan
+```{r}
+
+g.pca_iris<-autoplot(prcomp(iris_data), data = iris, colour = 'Species', frame = T)
+g.pca_iris_log<-autoplot(prcomp(log.ir), data = iris_log, colour = 'ir.species', frame = T)
+g.pca_iris_center_scale<-autoplot(prcomp(iris_center_scale_data, center =  FALSE), data = iris_center_scale, colour = 'ir.species', frame = T)
+g.pca_iris_log_center_scale<-autoplot(prcomp(iris_log_center_scale_data, center =  FALSE), data = iris_log_center_scale, colour = 'ir.species', frame = T)
+
+g.pca_iris_comparison<-plot_grid(g.pca_iris, g.pca_iris_log, g.pca_iris_center_scale, g.pca_iris_log_center_scale, ncol=2,  align = 'v', rel_heights = c(1/5, 1/5, 1/5, 1/5),
+                           labels = c('A', 'B', 'C', 'D'))
+g.pca_iris_comparison
+# A. g.pca_iris, 
+# B. g.pca_iris_log,
+# C. g.pca_iris_center_scale,
+# D. g.pca_iris_log_center_scale
+```
+
