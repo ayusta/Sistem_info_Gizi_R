@@ -1,0 +1,177 @@
+---
+title: "Keracunan makanan"
+author: "ayusta"
+date: "3/18/2021"
+output: html_document
+---
+
+
+#instal package yang dibutuhkan
+```{r}
+install.packages("tm")
+install.packages("rtweet")
+install.packages("twitteR")
+install.packages("wordcloud2")
+install.packages("ggplot2")
+  
+```
+
+
+#load package yang dibutuhkan
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tm)
+library(rtweet)
+library(twitteR)
+library(wordcloud2)
+library(ggplot2)
+
+
+```
+
+# API Twitter 
+Kemudian ketik syntax dibawah ini untuk mengkoneksikan ke API twitter
+
+
+```{r APi}
+consumer_key <- "M36SJnDFTyqNpwInvubaXdrPD"
+consumer_secret <- "0Lvv36rkcUAni5JtOAJJgbO5j2Q3K7raLFsLJ8KaLd8gKOH8tp"
+access_token    <- "1370707501671350274-Shm0VK6KAKFX2tIAMn5eneTRvXy1QF"
+access_token_secret   <- "vxb73YYKyBr9OQmC1maXT7WPK4nXy4LsMDka7CGer4rMv"
+setup_twitter_oauth(consumer_key, consumer_secret, access_token, access_token_secret)
+```
+
+# ambil data
+
+Sebelum kalian menuliskan syntax dibawah ini, pastikan R kalian sudah terkoneksi oleh internet. Karena untuk mengambil data dari twitter harus membutuhkan internet.
+
+
+```{r data}
+data = searchTwitter('gorengan + mendoan', 
+                            n = 10000,
+                            retryOnRateLimit = 10e3)
+```
+
+# save data
+Pada variabel “data” merupakan perintah yang digunakan untuk mencari twit mengenai fadli zon dan Fadli Zon dengan jumlah pengambilan maksimal 10.000 twit.
+Setelah kalian mengambil datanya, kalian bisa save data tersebut dalam bentuk RDS. agar nanti tidak usah cape-cape ambil twitnya lagi.
+
+```{r}
+saveRDS(data,file = 'tweet-gorengan.rds')
+```
+
+
+# Untuk Load dataset
+Apabila kalian ingin me-load data tersebut, kalian tinggal ketik syntax berikut
+```{r}
+data <- readRDS('tweet-gorengan.rds')
+hai = twListToDF(data)
+
+```
+
+Visualisasi Frekuensi
+Berikut syntax untuk visualisasinya
+##visualisasi time series 
+```{r}
+ts_plot(hai, "1 hour") +
+  ggplot2::theme_minimal() +
+  ggplot2::theme(plot.title = ggplot2::element_text(face = "bold")) +
+  ggplot2::labs(
+    x = NULL, y = NULL,
+    title = "Frequency of keracunan gorengan dan mendoan from past 1 Week",
+    subtitle = "Twitter status (tweet) counts aggregated using three-hour intervals",
+    caption = "\nSource: Data collected from Twitter's REST API via rtweet"
+  )
+
+```
+
+# data explorasi
+```{r}
+hai
+write.csv(hai, "hai_gorengan.csv") 
+
+```
+
+
+#Membersihkan Data
+Pertama kita harus memisahkan twitnya terlebih dahulu, yang kita perlukan hanya mengambil bagian twitnya saja.
+
+```{r}
+# asosiasi
+komen <- hai$text
+
+# ambil data tweet saja
+komenc <- Corpus(VectorSource(komen))
+
+```
+
+
+# Untuk Cleaning data
+Pada bagian ini kita akan menghapus beberapa kata, tanda baca, link url, huruf-huruf aneh, emoji dan lainnya.
+
+```{r}
+
+removeURL <- function(x) gsub("http[^[:space:]]*", "", x)
+twitclean <- tm_map(komenc, removeURL)
+removeNL <- function(y) gsub("\n", " ", y)
+twitclean <- tm_map(twitclean, removeNL)
+replacecomma <- function(y) gsub(",", "", y)
+twitclean <- tm_map(twitclean, replacecomma)
+removeRT <- function(y) gsub("RT ", "", y)
+twitclean <- tm_map(twitclean, removeRT)
+removetitik2 <- function(y) gsub(":", "", y)
+twitclean <- tm_map(twitclean, removetitik2)
+removetitikkoma <- function(y) gsub(";", " ", y)
+twitclean <- tm_map(twitclean, removetitikkoma)
+removetitik3 <- function(y) gsub("p…", "", y)
+twitclean <- tm_map(twitclean, removetitik3)
+removeamp <- function(y) gsub("&amp;", "", y)
+twitclean <- tm_map(twitclean, removeamp)
+removeUN <- function(z) gsub("@\\w+", "", z)
+twitclean <- tm_map(twitclean, removeUN)
+remove.all <- function(xy) gsub("[^[:alpha:][:space:]]*", "", xy)
+twitclean <- tm_map(twitclean,remove.all)
+twitclean <- tm_map(twitclean, removePunctuation)
+twitclean <- tm_map(twitclean, tolower)
+```
+
+# Untuk menghapus stopword
+
+```{r}
+
+myStopwords = readLines("stopword.csv")
+twitclean <- tm_map(twitclean,removeWords,myStopwords)
+twitclean <- tm_map(twitclean , removeWords, 
+                    c('indonesia', 'makanan', 'gorengan', 'mendoan', 'makan'))
+
+```
+#Membangun term-document matrix
+Pada variabel “twitclean” adalah kata-kata yang ingin kita apus, yang ditambahkan oleh kita sendiri. Selanjutnya memuat DTM (Document term Matriks). DTM ini berguna untuk membuat matriks berisi nilai untuk masing masing kata.
+
+```{r}
+
+dtm <- TermDocumentMatrix(twitclean)
+q <- as.matrix(dtm)
+p <- sort(rowSums(q),decreasing=TRUE)
+hai <- data.frame(word = names(p),freq=p)
+```
+
+#top ten
+Kemudian kita bisa melihat 10 kata-kata yang sering muncul, dengan menuliskan syntax dibawah ini:
+```{r}
+head(hai,n=10)
+hai
+```
+
+#Membuat Wordcloud
+Setelah semuanya sudah kalian running, bagian akhirnya yaitu membuat wordcloud. berikut ini adalah perintah untuk membuat wordcloudnya.
+```{r}
+cloud<-wordcloud2(hai,shape = "cloud",
+           backgroundColor = "white",
+           color = 'random-light' ,
+           size = 0.5)
+cloud
+
+```
+
